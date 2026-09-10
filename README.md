@@ -1,4 +1,4 @@
-# testwebserver — 웹 서비스 가용성 데모 (IaC / RAPA 2차)
+# testwebserver — 웹 서비스 가용성 데모 (IaC)
 
 vSphere / VMware Workstation 위에 **손으로 클론해 둔 리눅스 VM** 안에서,
 저장소를 clone 하고 **역할 인자와 함께 스크립트 하나**를 실행하면 그 역할로 세팅된다.

@@ -2,7 +2,14 @@
 
 set -e
 
-INTERFACE="ens34"
+ROLE="$1"
+INTERFACE="$2"
+
+if [ -z "$ROLE" ] || [ -z "$INTERFACE" ]; then
+    echo "사용법: sudo $0 {lb1|lb2|web1|web2|web3|victim|attacker} {ens33|ens34}"
+    exit 1
+fi
+
 GATEWAY="192.168.0.1"
 PREFIX="24"
 

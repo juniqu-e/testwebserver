@@ -1,0 +1,50 @@
+#---------------------------------------------------------------------
+# HAProxy L7 (mode http) - RAPA web availability demo
+# 이 파일은 템플릿이다. roles/lb.sh 가 아래 자리표시자를 치환한다:
+#   @@WEB_BACKENDS@@       -> "server web1 10.0.0.11:80 check ..." 여러 줄
+#   @@TIMEOUT_HTTPREQUEST@@ -> Slowloris 방어용 값 (기본 5s). 데모에서 끄고 켜기 위해 변수화
+#---------------------------------------------------------------------
+global
+    log /dev/log local0
+    maxconn 4096
+    daemon
+
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    retries 3
+    timeout connect 5s
+    timeout client  30s
+    timeout server  30s
+    # --- Slowloris 방어 핵심 ---
+    # 클라이언트가 요청 헤더 전체를 이 시간 안에 보내지 못하면 끊는다.
+    # 데모에서 이 줄을 빼면(=매우 크게) 느린 헤더 공격에 취약해진다.
+    timeout http-request @@TIMEOUT_HTTPREQUEST@@
+
+#---------------------------------------------------------------------
+# 프런트엔드: :80 으로 들어온 트래픽을 web 백엔드로
+#---------------------------------------------------------------------
+frontend http_in
+    bind *:80
+    default_backend web_pool
+
+#---------------------------------------------------------------------
+# 백엔드: web 노드들 roundrobin + 헬스체크
+#---------------------------------------------------------------------
+backend web_pool
+    balance roundrobin
+    option httpchk GET /
+    http-check expect status 200
+    # @@WEB_BACKENDS@@
+
+#---------------------------------------------------------------------
+# 통계 페이지 :8404/stats  (failover 시 DOWN 확인용)
+#---------------------------------------------------------------------
+frontend stats
+    bind *:8404
+    stats enable
+    stats uri /stats
+    stats refresh 2s
+    stats show-node

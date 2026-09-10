@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>web :: @@HOSTNAME@@</title>
+  <style>
+    /* 색은 hostname 해시로 산출한 --hue 로 결정 (JS에서 주입).
+       JS 없거나 실패 시 중립 회색으로 폴백해도 값은 그대로 읽힘. */
+    :root {
+      --hue: 210;
+      --sat: 0%;                 /* JS 성공 시 75% 로 승격 */
+      --accent: hsl(var(--hue) var(--sat) 60%);
+      --bg:     hsl(var(--hue) calc(var(--sat) * 0.6) 7%);
+      --card:   hsl(var(--hue) calc(var(--sat) * 0.35) 12%);
+      --muted:  hsl(var(--hue) calc(var(--sat) * 0.25) 70%);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: #f5f7fa;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .label {
+      position: fixed; top: 1.1rem; left: 1.3rem;
+      display: flex; align-items: center; gap: .5rem;
+      font-size: clamp(.8rem, 1.6vw, 1.1rem);
+      letter-spacing: .04em; color: var(--muted);
+    }
+    .label .dot {
+      width: .8em; height: .8em; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 12px var(--accent);
+    }
+    .refresh-badge {
+      position: fixed; top: 1.1rem; right: 1.3rem;
+      display: none; align-items: center; gap: .45rem;
+      font-size: clamp(.75rem, 1.4vw, 1rem); font-weight: 700;
+      letter-spacing: .08em; color: var(--accent);
+      border: 2px solid var(--accent); border-radius: 999px;
+      padding: .3rem .8rem;
+    }
+    .refresh-badge.on { display: inline-flex; }
+    .refresh-badge .blink {
+      width: .7em; height: .7em; border-radius: 50%;
+      background: var(--accent); animation: blink 1s steps(2, start) infinite;
+    }
+    @keyframes blink { 50% { opacity: .15; } }
+
+    .card {
+      width: min(92vw, 1100px);
+      background: var(--card);
+      border-radius: 24px;
+      border: 1px solid hsl(var(--hue) var(--sat) 25%);
+      box-shadow: 0 24px 80px rgba(0,0,0,.55), 0 0 0 6px hsl(var(--hue) var(--sat) 18%);
+      overflow: hidden;
+      text-align: center;
+    }
+    .bar { height: clamp(10px, 1.6vw, 20px); background: var(--accent); }
+    .card .body { padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 3rem); }
+
+    .kicker {
+      font-size: clamp(.85rem, 2vw, 1.3rem);
+      letter-spacing: .35em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: .3rem;
+    }
+    .hostname {
+      font-size: clamp(3rem, 12vw, 9rem);
+      font-weight: 800; line-height: .95;
+      color: var(--accent);
+      word-break: break-all;
+      text-shadow: 0 0 30px hsl(var(--hue) var(--sat) 40% / .5);
+      margin: 0;
+    }
+    .rows { margin-top: clamp(1.2rem, 3.5vw, 2.6rem); }
+    .field { margin-top: clamp(.6rem, 1.8vw, 1.2rem); }
+    .field .tag {
+      display: block;
+      font-size: clamp(.75rem, 1.6vw, 1.1rem);
+      letter-spacing: .25em; color: var(--muted);
+    }
+    .mac {
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: clamp(1.6rem, 6vw, 4rem);
+      font-weight: 700; color: #ffffff;
+      word-break: break-all;
+    }
+    .ip {
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: clamp(1.2rem, 3.5vw, 2.2rem);
+      font-weight: 600; color: var(--muted);
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="label"><span class="dot"></span>RAPA 2차 팀발표 · 웹 가용성 데모</div>
+  <div class="refresh-badge" id="rb"><span class="blink"></span>AUTO-REFRESH 1s</div>
+
+  <main class="card">
+    <div class="bar"></div>
+    <div class="body">
+      <div class="kicker">web node</div>
+      <!-- 서버가 렌더한 실제 값 (부팅 때 hostname/IP/MAC 재주입) -->
+      <h1 class="hostname" id="hostname">@@HOSTNAME@@</h1>
+      <div class="rows">
+        <div class="field">
+          <span class="tag">MAC</span>
+          <span class="mac">@@MAC@@</span>
+        </div>
+        <div class="field">
+          <span class="tag">IP</span>
+          <span class="ip">@@IP@@</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // 색은 반드시 "서버가 렌더한 hostname 텍스트"에서만 나온다. 클라이언트가 지어내지 않음.
+    (function () {
+      var host = (document.getElementById('hostname').textContent || '').trim();
+      if (host) {
+        // djb2 해시 후 fmix32(avalanche)로 섞는다.
+        // avalanche 를 넣어야 web1/web2/web3 처럼 마지막 글자만 다른 이름도
+        // hue 가 멀리 벌어져 색이 확실히 구분된다.
+        var h = 5381;
+        for (var i = 0; i < host.length; i++) {
+          h = ((h << 5) + h + host.charCodeAt(i)) >>> 0;
+        }
+        h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+        h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+        h ^= h >>> 16; h = h >>> 0;
+        var hue = h % 360;
+        var root = document.documentElement;
+        root.style.setProperty('--hue', hue);
+        root.style.setProperty('--sat', '75%');   // 회색 폴백 -> 서버색으로 승격
+      }
+      // ?refresh=1 (또는 refresh 파라미터 존재) 이면 1초마다 자동 새로고침
+      var p = new URLSearchParams(window.location.search);
+      if (p.has('refresh') && p.get('refresh') !== '0') {
+        document.getElementById('rb').classList.add('on');
+        setTimeout(function () { window.location.reload(); }, 1000);
+      }
+    })();
+  </script>
+</body>
+</html>

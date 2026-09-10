@@ -1,0 +1,39 @@
+#---------------------------------------------------------------------
+# keepalived - HAProxy VIP failover (RAPA web availability demo)
+# 두 대의 lb(lb1=MASTER, lb2=BACKUP)가 하나의 가상 IP(VIP)를 공유한다.
+# VIP 를 들고 있던 lb 가 죽으면(또는 그 위 haproxy 가 죽으면) VIP 가 다른 lb 로 넘어간다.
+#
+# 이 파일은 템플릿이다. roles/lb.sh 가 아래 자리표시자를 치환한다:
+#   @@STATE@@       MASTER | BACKUP
+#   @@INTERFACE@@   기본 인터페이스(자동 감지, 하드코딩 금지)
+#   @@VRID@@        virtual_router_id (두 lb 동일해야 함)
+#   @@PRIORITY@@    우선순위(MASTER 가 높음)
+#   @@VIP@@         가상 IP (실행 시 주입, 하드코딩 금지)
+#   # @@AUTH_BLOCK@@     VRRP_PASS 를 주면 인증 블록으로, 아니면 제거
+#   # @@UNICAST_BLOCK@@  PEER 를 주면 unicast 블록으로, 아니면 제거(멀티캐스트)
+#---------------------------------------------------------------------
+
+# haproxy 프로세스가 살아있는지 추적. 죽으면 priority 를 낮춰 VIP 를 넘긴다.
+vrrp_script chk_haproxy {
+    script "/usr/bin/pgrep -x haproxy"
+    interval 2
+    weight -60
+    fall 2
+    rise 2
+}
+
+vrrp_instance VI_1 {
+    state @@STATE@@
+    interface @@INTERFACE@@
+    virtual_router_id @@VRID@@
+    priority @@PRIORITY@@
+    advert_int 1
+    # @@AUTH_BLOCK@@
+    # @@UNICAST_BLOCK@@
+    virtual_ipaddress {
+        @@VIP@@
+    }
+    track_script {
+        chk_haproxy
+    }
+}

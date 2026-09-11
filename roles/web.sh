@@ -7,6 +7,8 @@
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# shellcheck source=lib-nginx-weak.sh
+source "$REPO_DIR/roles/lib-nginx-weak.sh"
 TMPL_SRC="$REPO_DIR/templates/index.html.tmpl"
 STATE_DIR="/etc/rapa-demo"
 TMPL_DST="$STATE_DIR/index.html.tmpl"
@@ -81,8 +83,9 @@ UNITEOF
 systemctl daemon-reload
 systemctl enable rapa-web-index.service >/dev/null 2>&1 || true
 
-# --- 5) 지금 즉시 1회 생성 + nginx 기동 ---
+# --- 5) 지금 즉시 1회 생성 + (동일)약화 적용 + nginx 기동 ---
 "$GEN_BIN"
+apply_nginx_weak        # WEAK=1 이면 web 백엔드도 victim 과 동일하게 약화
 systemctl enable nginx >/dev/null 2>&1 || true
 systemctl restart nginx
 

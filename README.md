@@ -13,7 +13,7 @@ vSphere / VMware Workstation 위에 **손으로 클론해 둔 리눅스 VM** 안
 
 | | 대조군 (victim) | 이중화 서비스 (web×3 + lb×2) |
 |---|---|---|
-| 구조 | apache 1대, LB 없음 | HAProxy(이중화) 뒤에 web 3대 |
+| 구조 | nginx 1대(web과 동일), LB 없음 | HAProxy 뒤에 같은 nginx 3대 |
 | **공격받으면** | 그대로 죽음 → 서비스 다운 | lb 의 `timeout http-request` 가 막음 → 유지 |
 | **한 대가 죽으면** | 서비스 전체 다운 | 나머지가 계속 서비스 → **무중단(HA)** |
 
@@ -52,7 +52,7 @@ vSphere / VMware Workstation 위에 **손으로 클론해 둔 리눅스 VM** 안
 
    ┌──────────────┐            ┌────────────────────────┐
    │ victim       │◄──(공격)── │ attacker 10.0.0.41      │
-   │ apache2 단독 │            │ slowhttptest / ab(설치만)│
+   │ nginx (동일) │            │ slowhttptest / ab(설치만)│
    │  10.0.0.31   │            └────────────────────────┘
    └──────────────┘   ← 로드밸런서 없는 대조군
 ```
@@ -61,7 +61,7 @@ vSphere / VMware Workstation 위에 **손으로 클론해 둔 리눅스 VM** 안
 |-----------|-------------------------------|-----------------------------------------------------------------|
 | `web`     | nginx                         | 응답 페이지에 hostname/IP/MAC + hostname 해시색 표시. 부팅마다 갱신 |
 | `lb`      | haproxy (+keepalived 선택)     | L7 roundrobin + 헬스체크 + stats(:8404) + Slowloris timeout, VIP 이중화 |
-| `victim`  | apache2                       | 로드밸런서 없는 대조군. `WEAK=1` 로 데모용 취약 모드              |
+| `victim`  | nginx (web 과 동일)            | 로드밸런서 없는 단일 서버(대조군). web 과 **동일 서버·동일 약화**(lib 공유) |
 | `attacker`| slowhttptest, apache2-utils, wrk, siege | Slowloris + HTTP Flood 도구 **설치만**(실행은 수동)                      |
 
 > 예시 IP 는 전부 **더미**다. 실제 IP·VIP·암호는 파일에 넣지 않고 **실행 인자/환경변수로만** 준다.
@@ -79,6 +79,8 @@ cd testwebserver
 
 # web VM (web1 / web2 / web3 — 동일 스크립트 공용)
 sudo ./setup.sh web
+#   공정 비교(공격 데모)용: web 3대 + victim 을 "똑같이" 약화 (아래 참고)
+#   sudo WEAK=1 ./setup.sh web
 
 # lb VM (단일)
 sudo WEB_BACKENDS="10.0.0.11 10.0.0.12 10.0.0.13" ./setup.sh lb
@@ -89,13 +91,18 @@ sudo WEB_BACKENDS="10.0.0.11 10.0.0.12 10.0.0.13" VIP=10.0.0.100 LB_ROLE=master 
 #   lb2(BACKUP):
 sudo WEB_BACKENDS="10.0.0.11 10.0.0.12 10.0.0.13" VIP=10.0.0.100 LB_ROLE=backup PEER=10.0.0.21 ./setup.sh lb
 
-# victim VM
-sudo ./setup.sh victim            # 정상(방어 살아있음)
-sudo WEAK=1 ./setup.sh victim     # 데모용 취약(reqtimeout off + prefork + 워커 25) → Slowloris 로 확실히 다운
+# victim VM (web 과 동일한 nginx. LB 만 없음)
+sudo ./setup.sh victim            # 정상
+sudo WEAK=1 ./setup.sh victim     # 약화 — 단, web 3대도 WEAK=1 로 맞춰야 공정
 
 # attacker VM
 sudo ./setup.sh attacker
 ```
+
+> **공정한 공격 비교(중요)**: victim 만 약화하면 "짜고 치는" 데모가 된다.
+> **victim 과 web 3대를 전부 `WEAK=1` 로 동일하게** 세팅하라(같은 nginx·같은 `worker_connections`).
+> 그러면 단일 victim 은 죽고, **똑같이 약한 web 3대는 HAProxy(`timeout http-request` + 분산) 덕에 버틴다.**
+> → 서버 성능 차이가 아니라 **오직 "앞에 LB 가 있냐"** 가 결과를 가른다. (`WEAK` 미지정으로 재실행하면 양쪽 다 정상 복구)
 
 lb 이중화 옵션(환경변수): `VIP`(필수, 서비스 대표주소) · `LB_ROLE`(master|backup) · `PEER`(상대 lb IP, 권장) ·
 `VRID`(기본 51, 두 lb 동일) · `VRRP_PASS`(선택, 값은 파일에 넣지 말고 실행 시에만).
@@ -165,19 +172,23 @@ sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" \
    `for i in $(seq 1 6); do curl -s http://10.0.0.100/ | grep -o 'id="hostname">[^<]*'; done`
    → web1/web2/web3 이 roundrobin. 브라우저로 `?refresh=1` 열면 **화면색(보라/주황/초록)** 이 번갈아 → 뒷자리에서도 서버 교체가 보임. `:8404/stats` 3대 모두 **UP**.
 
+   **공정 세팅**: 공격 데모 전에 **victim 과 web 3대를 전부 `WEAK=1`** 로(같은 nginx·같은 약화).
+   ```bash
+   # (victim VM)  sudo WEAK=1 ./setup.sh victim
+   # (web1/2/3)   sudo WEAK=1 ./setup.sh web
+   ```
+
 2. **attacker → victim 공격 → 죽음 (대조군)**
    ```bash
-   # victim 을 데모용 취약으로 세팅해 두면 확실히 다운됨
-   #   (victim VM 에서)  sudo WEAK=1 ./setup.sh victim
    slowhttptest -c 500 -H -i 10 -r 200 -t GET -u http://10.0.0.31/ -x 24 -p 3
    ```
-   다른 창 `curl http://10.0.0.31/` → 타임아웃. 단일 apache2 는 워커 고갈로 **응답 불능(다운)**.
+   다른 창 `curl http://10.0.0.31/` → 타임아웃. 단일 nginx 는 `worker_connections` 고갈로 **응답 불능(다운)**. (가용성 victim 패널 빨강)
 
-3. **같은 공격을 서비스 VIP 로 → 버팀**
+3. **같은 공격을 서비스 VIP 로 → 버팀 (같은 약한 nginx ×3)**
    ```bash
    slowhttptest -c 500 -H -i 10 -r 200 -t GET -u http://10.0.0.100/ -x 24 -p 3
    ```
-   `curl http://10.0.0.100/` 는 계속 응답. HAProxy `timeout http-request` 가 느린 헤더 커넥션을 끊어 백엔드를 보호.
+   `curl http://10.0.0.100/` 는 계속 응답. **똑같이 약한 nginx 3대인데** HAProxy `timeout http-request` 가 느린 커넥션을 앞에서 끊고 부하를 분산해 백엔드가 멀쩡. → **서버 성능이 아니라 LB 유무가 결과를 가름.**
 
 4. **lb timeout 적용 전/후 비교**
    ```bash
@@ -203,12 +214,13 @@ sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" \
    ```
    `ip addr | grep 10.0.0.100` 로 확인 → VIP 가 **lb2 로 이동**. 그동안 `curl http://10.0.0.100/` 는 계속 응답(서비스 대표주소 무중단). lb1 복구 시 우선순위대로 VIP 회수.
 
-7. **(옵션) HTTP Flood → 사양 낮춘 victim OOM**
-   victim VM 을 RAM 512MB~1GB / 1 vCPU 로 낮춘 뒤:
+7. **(옵션) HTTP Flood → 용량 비교 (1대 vs 3대)**
+   위와 같이 양쪽 `WEAK=1` 상태에서:
    ```bash
-   for i in 1 2 3 4; do ab -n 100000 -c 300 -k http://10.0.0.31/ & done
+   for i in 1 2 3 4; do ab -n 100000 -c 300 -k http://10.0.0.31/ & done      # victim
+   for i in 1 2 3 4; do ab -n 100000 -c 300 -k http://10.0.0.100/ & done     # VIP
    ```
-   저사양 + prefork 대량 fork → 스왑/OOM 으로 박스 먹통. 같은 부하를 VIP 로 주면 3대 분산으로 안정 → 처리량/실패율 비교.
+   약한 nginx 1대(victim)는 커넥션 포화로 지연/실패 급증, **똑같은 3대+LB(VIP)** 는 부하가 분산돼 안정 → 처리량·실패율·CPU 비교.
 
 ### 복구(정상화)
 ```bash
@@ -229,12 +241,13 @@ sudo systemctl start keepalived   # lb
 testwebserver/
 ├── setup.sh               # 진입점. web|lb|victim|attacker|monitor|node-exporter
 ├── roles/
-│   ├── web.sh
+│   ├── web.sh             # nginx 웹 노드. WEAK=1 로 동일 약화
 │   ├── lb.sh              # HAProxy + (선택) keepalived VIP 이중화 + /metrics
-│   ├── victim.sh          # apache2 단독. WEAK=1 데모 취약 모드
+│   ├── victim.sh          # web 과 동일 nginx(대조군, LB 없음)
 │   ├── attacker.sh
 │   ├── monitor.sh         # Prometheus + Grafana (관측 스택)
-│   └── node-exporter.sh   # node_exporter(:9100) CPU/RAM 지표
+│   ├── node-exporter.sh   # node_exporter(:9100) CPU/RAM 지표
+│   └── lib-nginx-weak.sh  # web·victim 공유: 동일 nginx 약화 함수
 ├── templates/
 │   ├── haproxy.cfg.tmpl   # 백엔드 IP·timeout 은 실행 시 주입, :8405/metrics
 │   ├── keepalived.conf.tmpl  # VIP/역할/인터페이스는 실행 시 주입

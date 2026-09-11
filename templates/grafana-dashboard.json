@@ -15,7 +15,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 20 } }, "overrides": [] },
       "targets": [
-        { "refId": "A", "expr": "haproxy_server_up{proxy=\"web_pool\"}", "legendFormat": "{{server}}" }
+        { "refId": "A", "expr": "haproxy_server_status{proxy=\"web_pool\"}", "legendFormat": "{{server}}" }
       ]
     },
     {

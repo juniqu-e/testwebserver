@@ -89,7 +89,8 @@ echo "[*] haproxy 반영됨 (timeout http-request = ${TIMEOUT_HTTPREQUEST})"
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
   ufw allow 80/tcp   >/dev/null 2>&1 || true
   ufw allow 8404/tcp >/dev/null 2>&1 || true
-  echo "[*] ufw: 80/tcp, 8404/tcp 개방"
+  ufw allow 8405/tcp >/dev/null 2>&1 || true
+  echo "[*] ufw: 80/tcp, 8404/tcp(stats), 8405/tcp(metrics) 개방"
 fi
 
 # --- 6) [선택] lb 이중화: keepalived VIP failover ---
@@ -173,8 +174,7 @@ echo
 echo "----- 자체 검증 (lb) -----"
 echo "\$ curl 를 6회 반복 -> 응답 hostname 이 순환하는지 확인"
 for n in $(seq 1 6); do
-  line="$(curl -s --max-time 5 localhost | grep HOSTNAME || true)"
-  host="$(printf '%s' "$line" | sed -n 's/.*class=\"v\">\([^<]*\)<.*/\1/p')"
+  host="$(curl -s --max-time 5 localhost | sed -n 's/.*id="hostname">\([^<]*\)<.*/\1/p')"
   echo "  [$n] hostname=${host:-<no-response>}"
 done
 echo "stats 페이지: http://<lb-ip>:8404/stats"

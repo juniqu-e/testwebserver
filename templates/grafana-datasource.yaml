@@ -1,0 +1,10 @@
+# Grafana 데이터소스 자동 프로비저닝 (로컬 Prometheus)
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: true

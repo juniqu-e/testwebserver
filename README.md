@@ -116,7 +116,7 @@ curl -s localhost | grep MAC
 systemctl status rapa-web-index.service     # 부팅 재생성 서비스
 
 # lb: roundrobin 순환 (hostname 이 번갈아 나오면 정상)
-for i in $(seq 1 6); do curl -s http://10.0.0.100/ | grep HOSTNAME; done
+for i in $(seq 1 6); do curl -s http://10.0.0.100/ | grep -o 'id="hostname">[^<]*'; done
 #   stats 페이지:  http://<lb-ip>:8404/stats
 haproxy -c -f /etc/haproxy/haproxy.cfg       # 설정 문법 검증
 
@@ -130,13 +130,36 @@ curl -sI http://10.0.0.31/ | head -n1
 
 ---
 
+## 관측 (Prometheus + Grafana) — 선택, 발표 시각화용
+
+별도 **monitor VM 1대**에 관측 스택을 올려 failover·공격을 실시간 그래프로 보여준다.
+데이터 출처: **HAProxy 내장 exporter**(`:8405/metrics`) + 각 노드 **node_exporter**(`:9100`).
+
+```bash
+# 1) 감시 대상 VM(web/lb/victim) 각각에 node_exporter
+sudo ./setup.sh node-exporter
+
+# 2) lb 는 /metrics 가 열리도록 재실행(멱등) — 기존 lb 명령 그대로 다시
+#    (haproxy.cfg 에 :8405 metrics 프런트엔드가 추가됨)
+
+# 3) monitor VM 에서 스택 (수집 대상은 실행 인자로, IP 하드코딩 안 함)
+sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" \
+     NODE_TARGETS="10.0.0.180 10.0.0.181 10.0.0.182 10.0.0.183 10.0.0.184 10.0.0.185" \
+     ./setup.sh monitor
+```
+
+- Grafana: `http://<monitor-ip>:3000` (기본 admin/admin, 최초 로그인 시 변경) → Dashboards → RAPA → "RAPA 웹 가용성 데모"
+- Prometheus: `http://<monitor-ip>:9090/targets` 에서 대상 UP 확인
+- 대시보드 패널: **백엔드 UP/DOWN · 현재 커넥션(공격 급증) · 요청률(roundrobin) · 5xx · 노드 CPU/RAM(victim OOM)**
+- monitor VM 은 인터넷 필요(Grafana 저장소). 비밀번호·IP 는 파일에 저장하지 않는다.
+
 ## 발표 데모 순서
 
 각 화면은 **?refresh=1** 을 붙여 열면 1초마다 자동 새로고침돼(서버색이 바뀌는 걸 자동으로 보여줌):
 `http://10.0.0.100/?refresh=1`
 
 1. **정상 순환(로드밸런싱)**
-   `for i in $(seq 1 6); do curl -s http://10.0.0.100/ | grep HOSTNAME; done`
+   `for i in $(seq 1 6); do curl -s http://10.0.0.100/ | grep -o 'id="hostname">[^<]*'; done`
    → web1/web2/web3 이 roundrobin. 브라우저로 `?refresh=1` 열면 **화면색(보라/주황/초록)** 이 번갈아 → 뒷자리에서도 서버 교체가 보임. `:8404/stats` 3대 모두 **UP**.
 
 2. **attacker → victim 공격 → 죽음 (대조군)**
@@ -201,16 +224,22 @@ sudo systemctl start keepalived   # lb
 
 ```
 testwebserver/
-├── setup.sh               # 진입점. 첫 인자로 역할: web|lb|victim|attacker
+├── setup.sh               # 진입점. web|lb|victim|attacker|monitor|node-exporter
 ├── roles/
 │   ├── web.sh
-│   ├── lb.sh              # HAProxy + (선택) keepalived VIP 이중화
+│   ├── lb.sh              # HAProxy + (선택) keepalived VIP 이중화 + /metrics
 │   ├── victim.sh          # apache2 단독. WEAK=1 데모 취약 모드
-│   └── attacker.sh
+│   ├── attacker.sh
+│   ├── monitor.sh         # Prometheus + Grafana (관측 스택)
+│   └── node-exporter.sh   # node_exporter(:9100) CPU/RAM 지표
 ├── templates/
-│   ├── haproxy.cfg.tmpl   # 백엔드 IP·timeout 은 실행 시 주입
+│   ├── haproxy.cfg.tmpl   # 백엔드 IP·timeout 은 실행 시 주입, :8405/metrics
 │   ├── keepalived.conf.tmpl  # VIP/역할/인터페이스는 실행 시 주입
-│   └── index.html.tmpl    # hostname/IP/MAC 자리표시자 + 해시색
+│   ├── index.html.tmpl    # hostname/IP/MAC 자리표시자 + 해시색
+│   ├── prometheus.yml.tmpl        # 수집 대상 실행 시 주입
+│   ├── grafana-datasource.yaml    # Grafana 데이터소스 프로비저닝
+│   ├── grafana-dashboard-provider.yaml
+│   └── grafana-dashboard.json     # 데모 대시보드(백엔드 UP/DOWN·커넥션·CPU/RAM)
 ├── README.md
 └── .gitignore
 ```

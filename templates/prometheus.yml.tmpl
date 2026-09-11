@@ -1,0 +1,20 @@
+# Prometheus 설정 (RAPA 데모). 대상은 roles/monitor.sh 가 주입한다:
+#   @@HAPROXY_TARGETS@@  lb 들의 :8405  (예: '10.0.0.180:8405','10.0.0.181:8405')
+#   @@NODE_TARGETS@@     node_exporter :9100 대상들
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'haproxy'
+    metrics_path: /metrics
+    static_configs:
+      - targets: [@@HAPROXY_TARGETS@@]
+
+  - job_name: 'node'
+    static_configs:
+      - targets: [@@NODE_TARGETS@@]
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

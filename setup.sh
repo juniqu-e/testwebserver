@@ -28,6 +28,8 @@ usage() {
             [선택] VIP 를 주면 keepalived 이중화(lb 2대 active/standby)
   victim    apache2 단독(로드밸런서 없는 대조군). WEAK=1 이면 데모용 취약 모드
   attacker  slowhttptest, apache2-utils(ab) 설치만
+  monitor   Prometheus + Grafana (관측 스택). 수집 대상은 HAPROXY_TARGETS/NODE_TARGETS 로
+  node-exporter  node_exporter(:9100) 설치. 감시 대상 VM(web/lb/victim)에서 실행
 
 예:
   sudo ./setup.sh web
@@ -38,11 +40,14 @@ usage() {
   sudo ./setup.sh victim            # 정상
   sudo WEAK=1 ./setup.sh victim     # 데모용 취약(Slowloris 로 확실히 다운)
   sudo ./setup.sh attacker
+  # 관측: 감시 대상 각 VM에서 node-exporter, monitor VM 에서 스택
+  sudo ./setup.sh node-exporter
+  sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" NODE_TARGETS="10.0.0.180 10.0.0.181 10.0.0.182 10.0.0.183 10.0.0.184 10.0.0.185" ./setup.sh monitor
 USAGE
 }
 
 case "$ROLE" in
-  web|lb|victim|attacker) ;;
+  web|lb|victim|attacker|monitor|node-exporter) ;;
   ""|-h|--help|help)
     usage
     [ -z "$ROLE" ] && exit 1 || exit 0

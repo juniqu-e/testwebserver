@@ -48,3 +48,11 @@ frontend stats
     stats uri /stats
     stats refresh 2s
     stats show-node
+
+#---------------------------------------------------------------------
+# Prometheus 지표 :8405/metrics  (Grafana 수집용, HAProxy 내장 exporter)
+#---------------------------------------------------------------------
+frontend prometheus
+    bind *:8405
+    http-request use-service prometheus-exporter if { path /metrics }
+    no log

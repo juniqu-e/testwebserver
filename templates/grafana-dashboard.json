@@ -9,49 +9,76 @@
   "timezone": "browser",
   "panels": [
     {
-      "type": "timeseries",
-      "title": "백엔드 UP/DOWN (1=UP, 0=DOWN)",
+      "type": "state-timeline",
+      "title": "서비스 가용성 · VIP (로드밸런싱)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 20 } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 85, "lineWidth": 0 },
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
+          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } } ]
+        },
+        "overrides": []
+      },
+      "options": { "mergeValues": true, "showValue": "auto", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": false } },
+      "targets": [
+        { "refId": "A", "expr": "probe_success{probe_role=\"vip\"}", "legendFormat": "VIP" }
+      ]
+    },
+    {
+      "type": "state-timeline",
+      "title": "서비스 가용성 · victim (단일 서버)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 85, "lineWidth": 0 },
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
+          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } } ]
+        },
+        "overrides": []
+      },
+      "options": { "mergeValues": true, "showValue": "auto", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": false } },
+      "targets": [
+        { "refId": "A", "expr": "probe_success{probe_role=\"victim\"}", "legendFormat": "victim" }
+      ]
+    },
+    {
+      "type": "state-timeline",
+      "title": "백엔드 UP/DOWN (web1/2/3)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 85, "lineWidth": 0 },
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
+          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } } ]
+        },
+        "overrides": []
+      },
+      "options": { "mergeValues": true, "showValue": "auto", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" } },
       "targets": [
         { "refId": "A", "expr": "max by (server) (haproxy_server_status{proxy=\"web_pool\",state=\"UP\"})", "legendFormat": "{{server}}" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "백엔드 현재 커넥션 (공격 시 급증)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "title": "요청률 roundrobin (web1/2/3)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
-      "targets": [
-        { "refId": "A", "expr": "sum by (server) (haproxy_server_current_sessions{proxy=\"web_pool\"})", "legendFormat": "{{server}}" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "요청률 (roundrobin 분산 확인)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15 } }, "overrides": [] },
       "targets": [
         { "refId": "A", "expr": "sum by (server) (rate(haproxy_server_sessions_total{proxy=\"web_pool\"}[1m]))", "legendFormat": "{{server}}" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "5xx 에러율",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
-      "targets": [
-        { "refId": "A", "expr": "sum by (server) (rate(haproxy_server_http_responses_total{proxy=\"web_pool\",code=\"5xx\"}[1m]))", "legendFormat": "{{server}} 5xx" }
-      ]
-    },
-    {
-      "type": "timeseries",
       "title": "노드 CPU 사용률 %",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
       "targets": [
@@ -61,21 +88,11 @@
     {
       "type": "timeseries",
       "title": "노드 메모리 사용률 % (victim OOM 관측)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
       "targets": [
         { "refId": "A", "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100", "legendFormat": "{{instance}}" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "서비스 가용성 · victim vs VIP (1=정상, 0=다운)",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 25 } }, "overrides": [] },
-      "targets": [
-        { "refId": "A", "expr": "probe_success", "legendFormat": "{{instance}}" }
       ]
     }
   ]

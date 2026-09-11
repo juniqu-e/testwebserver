@@ -16,7 +16,8 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 HAPROXY_TARGETS="${HAPROXY_TARGETS:-}"
 NODE_TARGETS="${NODE_TARGETS:-}"
-PROBE_TARGETS="${PROBE_TARGETS:-}"   # 가용성 프로브 대상 URL들 (예: http://10.0.0.185/ http://10.0.0.190/)
+PROBE_VIP="${PROBE_VIP:-}"           # VIP(로드밸런싱) URL   (예: http://10.0.0.190/)
+PROBE_VICTIM="${PROBE_VICTIM:-}"     # victim(단일) URL      (예: http://10.0.0.185/)
 
 if [ -z "${HAPROXY_TARGETS// /}" ]; then
   echo "[ERROR] HAPROXY_TARGETS 가 없습니다. IP 를 스크립트에 박지 않습니다." >&2
@@ -36,11 +37,11 @@ build_targets() {  # $1=목록  $2=기본포트
 HA_STR="$(build_targets "$HAPROXY_TARGETS" 8405)"
 NODE_STR="$(build_targets "${NODE_TARGETS:-}" 9100)"
 # 프로브 대상은 URL 이라 포트를 붙이지 않는다 (그대로 따옴표만)
-PROBE_STR=""
-for u in ${PROBE_TARGETS:-}; do PROBE_STR="${PROBE_STR:+$PROBE_STR,}'${u}'"; done
+VIP_STR="";    [ -n "${PROBE_VIP:-}" ]    && VIP_STR="'${PROBE_VIP}'"
+VICTIM_STR=""; [ -n "${PROBE_VICTIM:-}" ] && VICTIM_STR="'${PROBE_VICTIM}'"
 echo "[*] haproxy targets: $HA_STR"
 echo "[*] node targets:    ${NODE_STR:-<none>}"
-echo "[*] probe targets:   ${PROBE_STR:-<none>}"
+echo "[*] probe vip:       ${VIP_STR:-<none>}   victim: ${VICTIM_STR:-<none>}"
 
 # --- 1) Prometheus 설치 (멱등, Ubuntu universe) ---
 if dpkg -s prometheus >/dev/null 2>&1; then
@@ -64,8 +65,8 @@ else
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq grafana
 fi
 
-# --- 2c) 가용성 프로브(blackbox_exporter) 설치 (PROBE_TARGETS 있으면) ---
-if [ -n "${PROBE_TARGETS// /}" ]; then
+# --- 2c) 가용성 프로브(blackbox_exporter) 설치 (PROBE_VIP/PROBE_VICTIM 있으면) ---
+if [ -n "${PROBE_VIP:-}${PROBE_VICTIM:-}" ]; then
   if dpkg -s prometheus-blackbox-exporter >/dev/null 2>&1; then
     echo "[=] prometheus-blackbox-exporter 이미 설치됨 - skip"
   else
@@ -80,7 +81,8 @@ fi
 TMP="$(mktemp)"
 sed -e "s#@@HAPROXY_TARGETS@@#${HA_STR}#g" \
     -e "s#@@NODE_TARGETS@@#${NODE_STR}#g" \
-    -e "s#@@PROBE_TARGETS@@#${PROBE_STR}#g" \
+    -e "s#@@PROBE_VIP@@#${VIP_STR}#g" \
+    -e "s#@@PROBE_VICTIM@@#${VICTIM_STR}#g" \
     "$REPO_DIR/templates/prometheus.yml.tmpl" > "$TMP"
 install -m 0644 "$TMP" /etc/prometheus/prometheus.yml
 rm -f "$TMP"

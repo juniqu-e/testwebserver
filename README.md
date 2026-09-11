@@ -62,7 +62,7 @@ vSphere / VMware Workstation 위에 **손으로 클론해 둔 리눅스 VM** 안
 | `web`     | nginx                         | 응답 페이지에 hostname/IP/MAC + hostname 해시색 표시. 부팅마다 갱신 |
 | `lb`      | haproxy (+keepalived 선택)     | L7 roundrobin + 헬스체크 + stats(:8404) + Slowloris timeout, VIP 이중화 |
 | `victim`  | apache2                       | 로드밸런서 없는 대조군. `WEAK=1` 로 데모용 취약 모드              |
-| `attacker`| slowhttptest, apache2-utils   | 공격/부하 도구 **설치만** (공격 실행은 수동)                     |
+| `attacker`| slowhttptest, apache2-utils, wrk, siege | Slowloris + HTTP Flood 도구 **설치만**(실행은 수동)                      |
 
 > 예시 IP 는 전부 **더미**다. 실제 IP·VIP·암호는 파일에 넣지 않고 **실행 인자/환경변수로만** 준다.
 > lb 이중화까지 하면 VM 은 web3 + lb2 + victim + attacker = **7대**. 이중화가 필요 없으면 lb 1대로 축소 가능.

@@ -18,11 +18,11 @@
           "custom": { "fillOpacity": 85, "lineWidth": 0 },
           "color": { "mode": "thresholds" },
           "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
-          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } } ]
+          "mappings": [ { "type": "range", "options": { "from": 0.5, "to": 1000000, "result": { "text": "UP", "color": "green", "index": 0 } } }, { "type": "range", "options": { "from": -1000000, "to": 0.5, "result": { "text": "DOWN", "color": "red", "index": 1 } } } ]
         },
         "overrides": []
       },
-      "options": { "mergeValues": true, "showValue": "auto", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": false } },
+      "options": { "mergeValues": true, "showValue": "always", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": false } },
       "targets": [
         { "refId": "A", "expr": "probe_success{probe_role=\"vip\"}", "legendFormat": "VIP" }
       ]
@@ -37,11 +37,11 @@
           "custom": { "fillOpacity": 85, "lineWidth": 0 },
           "color": { "mode": "thresholds" },
           "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
-          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } } ]
+          "mappings": [ { "type": "range", "options": { "from": 0.5, "to": 1000000, "result": { "text": "UP", "color": "green", "index": 0 } } }, { "type": "range", "options": { "from": -1000000, "to": 0.5, "result": { "text": "DOWN", "color": "red", "index": 1 } } } ]
         },
         "overrides": []
       },
-      "options": { "mergeValues": true, "showValue": "auto", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": false } },
+      "options": { "mergeValues": true, "showValue": "always", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": false } },
       "targets": [
         { "refId": "A", "expr": "probe_success{probe_role=\"victim\"}", "legendFormat": "victim" }
       ]
@@ -56,11 +56,11 @@
           "custom": { "fillOpacity": 85, "lineWidth": 0 },
           "color": { "mode": "thresholds" },
           "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] },
-          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } } ]
+          "mappings": [ { "type": "range", "options": { "from": 0.5, "to": 1000000, "result": { "text": "UP", "color": "green", "index": 0 } } }, { "type": "range", "options": { "from": -1000000, "to": 0.5, "result": { "text": "DOWN", "color": "red", "index": 1 } } } ]
         },
         "overrides": []
       },
-      "options": { "mergeValues": true, "showValue": "auto", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" } },
+      "options": { "mergeValues": true, "showValue": "always", "rowHeight": 0.9, "alignValue": "center", "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" } },
       "targets": [
         { "refId": "A", "expr": "max by (server) (haproxy_server_status{proxy=\"web_pool\",state=\"UP\"})", "legendFormat": "{{server}}" }
       ]

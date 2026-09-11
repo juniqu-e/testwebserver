@@ -16,6 +16,7 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 HAPROXY_TARGETS="${HAPROXY_TARGETS:-}"
 NODE_TARGETS="${NODE_TARGETS:-}"
+PROBE_TARGETS="${PROBE_TARGETS:-}"   # 가용성 프로브 대상 URL들 (예: http://10.0.0.185/ http://10.0.0.190/)
 
 if [ -z "${HAPROXY_TARGETS// /}" ]; then
   echo "[ERROR] HAPROXY_TARGETS 가 없습니다. IP 를 스크립트에 박지 않습니다." >&2
@@ -34,8 +35,12 @@ build_targets() {  # $1=목록  $2=기본포트
 }
 HA_STR="$(build_targets "$HAPROXY_TARGETS" 8405)"
 NODE_STR="$(build_targets "${NODE_TARGETS:-}" 9100)"
+# 프로브 대상은 URL 이라 포트를 붙이지 않는다 (그대로 따옴표만)
+PROBE_STR=""
+for u in ${PROBE_TARGETS:-}; do PROBE_STR="${PROBE_STR:+$PROBE_STR,}'${u}'"; done
 echo "[*] haproxy targets: $HA_STR"
 echo "[*] node targets:    ${NODE_STR:-<none>}"
+echo "[*] probe targets:   ${PROBE_STR:-<none>}"
 
 # --- 1) Prometheus 설치 (멱등, Ubuntu universe) ---
 if dpkg -s prometheus >/dev/null 2>&1; then
@@ -59,10 +64,23 @@ else
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq grafana
 fi
 
+# --- 2c) 가용성 프로브(blackbox_exporter) 설치 (PROBE_TARGETS 있으면) ---
+if [ -n "${PROBE_TARGETS// /}" ]; then
+  if dpkg -s prometheus-blackbox-exporter >/dev/null 2>&1; then
+    echo "[=] prometheus-blackbox-exporter 이미 설치됨 - skip"
+  else
+    echo "[*] prometheus-blackbox-exporter 설치 ..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq prometheus-blackbox-exporter
+  fi
+  systemctl enable prometheus-blackbox-exporter >/dev/null 2>&1 || true
+  systemctl restart prometheus-blackbox-exporter
+fi
+
 # --- 3) Prometheus 설정 렌더링 ---
 TMP="$(mktemp)"
 sed -e "s#@@HAPROXY_TARGETS@@#${HA_STR}#g" \
     -e "s#@@NODE_TARGETS@@#${NODE_STR}#g" \
+    -e "s#@@PROBE_TARGETS@@#${PROBE_STR}#g" \
     "$REPO_DIR/templates/prometheus.yml.tmpl" > "$TMP"
 install -m 0644 "$TMP" /etc/prometheus/prometheus.yml
 rm -f "$TMP"

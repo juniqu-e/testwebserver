@@ -67,6 +67,16 @@
       "targets": [
         { "refId": "A", "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100", "legendFormat": "{{instance}}" }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "서비스 가용성 · victim vs VIP (1=정상, 0=다운)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 25 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "probe_success", "legendFormat": "{{instance}}" }
+      ]
     }
   ]
 }

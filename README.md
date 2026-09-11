@@ -143,14 +143,17 @@ sudo ./setup.sh node-exporter
 #    (haproxy.cfg 에 :8405 metrics 프런트엔드가 추가됨)
 
 # 3) monitor VM 에서 스택 (수집 대상은 실행 인자로, IP 하드코딩 안 함)
+#    PROBE_TARGETS: victim/VIP URL 가용성 프로브(blackbox) - "죽음/생존"을 그래프로
 sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" \
      NODE_TARGETS="10.0.0.180 10.0.0.181 10.0.0.182 10.0.0.183 10.0.0.184 10.0.0.185" \
+     PROBE_TARGETS="http://10.0.0.185/ http://10.0.0.190/" \
      ./setup.sh monitor
 ```
 
 - Grafana: `http://<monitor-ip>:3000` (기본 admin/admin, 최초 로그인 시 변경) → Dashboards → RAPA → "RAPA 웹 가용성 데모"
 - Prometheus: `http://<monitor-ip>:9090/targets` 에서 대상 UP 확인
-- 대시보드 패널: **백엔드 UP/DOWN · 현재 커넥션(공격 급증) · 요청률(roundrobin) · 5xx · 노드 CPU/RAM(victim OOM)**
+- 대시보드 패널: **백엔드 UP/DOWN · 현재 커넥션(공격 급증) · 요청률(roundrobin) · 5xx · 노드 CPU/RAM · 서비스 가용성(victim vs VIP, probe_success)**
+- slowloris 는 자원이 아니라 "가용성"을 죽인다(워커 슬롯 고갈) → CPU/RAM 은 잘 안 움직이고, **가용성 프로브 패널에서 victim 선이 0으로 떨어지는 것**으로 확인한다. HTTP Flood 는 CPU/RAM 도 오른다.
 - monitor VM 은 인터넷 필요(Grafana 저장소). 비밀번호·IP 는 파일에 저장하지 않는다.
 
 ## 발표 데모 순서

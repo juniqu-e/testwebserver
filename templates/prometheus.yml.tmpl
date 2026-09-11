@@ -15,6 +15,21 @@ scrape_configs:
     static_configs:
       - targets: [@@NODE_TARGETS@@]
 
+  # 가용성 프로브: 대상 URL 이 200 을 주는지 직접 확인 (victim vs VIP 생사)
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: [@@PROBE_TARGETS@@]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']

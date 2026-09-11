@@ -42,7 +42,7 @@ usage() {
   sudo ./setup.sh attacker
   # 관측: 감시 대상 각 VM에서 node-exporter, monitor VM 에서 스택
   sudo ./setup.sh node-exporter
-  sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" NODE_TARGETS="10.0.0.180 10.0.0.181 10.0.0.182 10.0.0.183 10.0.0.184 10.0.0.185" ./setup.sh monitor
+  sudo HAPROXY_TARGETS="10.0.0.180 10.0.0.181" NODE_TARGETS="10.0.0.180 10.0.0.181 10.0.0.182 10.0.0.183 10.0.0.184 10.0.0.185" PROBE_TARGETS="http://10.0.0.185/ http://10.0.0.190/" ./setup.sh monitor
 USAGE
 }
 
